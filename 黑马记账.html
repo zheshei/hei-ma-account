@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑马记账</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2313151c'/%3E%3Cpath d='M9 22V10h3v4h8v-4h3v12h-3v-5h-8v5z' fill='%23d4a853'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+/* 设计变量：整个 app 的配色和尺寸都从这里取，改这里就能换肤 */
+:root{
+  --bg:#13151c;          /* 最外层背景，接近墨色 */
+  --bg-2:#181b24;        /* 侧边栏背景 */
+  --card:#1c1f2a;        /* 卡片背景 */
+  --card-2:#232735;      /* 卡片内部次级背景 */
+  --card-hover:#272b3a;  /* hover 时的颜色 */
+  --border:#2a2e3d;      /* 边框 */
+  --border-2:#353a4d;
+  --text:#eef0f6;        /* 主文字 */
+  --text-2:#a8aec2;      /* 次级文字 */
+  --text-3:#73798f;      /* 弱提示文字 */
+  --gold:#d4a853;        /* 品牌金：呼应"黑马" */
+  --gold-2:#e8c27a;      /* 亮一点的金，用于强调 */
+  --gold-dim:rgba(212,168,83,.14);
+  --green:#5ec98a;       /* 收入/正向 */
+  --green-dim:rgba(94,201,138,.14);
+  --red:#e8735a;         /* 支出/警示 */
+  --red-dim:rgba(232,115,90,.14);
+  --shadow:0 6px 24px rgba(0,0,0,.35);
+  --r:14px;              /* 卡片圆角 */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Noto Sans SC',system-ui,-apple-system,sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.num{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* ===== 布局 ===== */
+.app{display:flex;min-height:100vh}
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--bg-2);
+  border-right:1px solid var(--border);
+  padding:22px 14px;
+  position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px 22px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.brand-logo{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,#d4a853,#b8893a);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:#1a1408;font-size:15px;
+}
+.brand-name{font-size:16px;font-weight:600;letter-spacing:.02em}
+.brand-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.nav{display:flex;flex-direction:column;gap:2px;flex:1}
+.nav-item{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;border-radius:9px;
+  color:var(--text-2);font-size:14px;
+  transition:all .15s;
+}
+.nav-item svg{width:18px;height:18px;flex-shrink:0}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.active{background:var(--gold-dim);color:var(--gold-2)}
+.sidebar-foot{padding:12px 10px;border-top:1px solid var(--border);font-size:11px;color:var(--text-3)}
+
+.main{flex:1;padding:26px 32px;max-width:1200px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:600}
+.page-sub{font-size:12px;color:var(--text-3);margin-top:2px}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ===== 通用组件 ===== */
+.btn{
+  padding:8px 14px;border-radius:8px;font-size:13px;
+  background:var(--card-2);border:1px solid var(--border);
+  color:var(--text-2);transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{background:var(--card-hover);color:var(--text)}
+.btn-primary{background:var(--gold);color:#1a1408;font-weight:600;border-color:transparent}
+.btn-primary:hover{background:var(--gold-2)}
+.btn-danger{color:var(--red)}
+.btn svg{width:15px;height:15px}
+
+.month-picker{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:5px 8px}
+.month-picker button{width:26px;height:26px;border-radius:6px;color:var(--text-2);display:flex;align-items:center;justify-content:center}
+.month-picker button:hover{background:var(--card-hover);color:var(--text)}
+.month-picker .cur{font-size:14px;font-weight:500;min-width:96px;text-align:center}
+
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px;
+}
+.card-title{font-size:13px;color:var(--text-2);font-weight:500;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.card-title .more{font-size:12px;color:var(--text-3);cursor:pointer}
+.card-title .more:hover{color:var(--gold)}
+
+.grid{display:grid;gap:14px}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+
+/* 概览数字卡 */
+.stat-card{position:relative;overflow:hidden}
+.stat-label{font-size:12px;color:var(--text-3);margin-bottom:8px}
+.stat-value{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.stat-value.income{color:var(--green)}
+.stat-value.expense{color:var(--red)}
+.stat-foot{font-size:11px;color:var(--text-3);margin-top:8px}
+.stat-icon{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.stat-icon svg{width:18px;height:18px}
+
+/* 预算条 */
+.budget-row{margin-bottom:14px}
+.budget-row:last-child{margin-bottom:0}
+.budget-head{display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:6px}
+.budget-head .used{color:var(--text)}
+.budget-bar{height:7px;background:var(--bg-2);border-radius:4px;overflow:hidden}
+.budget-fill{height:100%;border-radius:4px;background:var(--gold);transition:width .4s}
+.budget-fill.warn{background:var(--red)}
+
+/* 流水列表 */
+.txn-list{display:flex;flex-direction:column}
+.txn{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 4px;border-bottom:1px solid var(--border);
+}
+.txn:last-child{border-bottom:none}
+.txn-icon{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.txn-icon svg{width:18px;height:18px}
+.txn-main{flex:1;min-width:0}
+.txn-cat{font-size:14px;font-weight:500}
+.txn-note{font-size:12px;color:var(--text-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.txn-amount{font-size:15px;font-weight:600}
+.txn-amount.exp{color:var(--red)}
+.txn-amount.inc{color:var(--green)}
+.txn-act{opacity:0;transition:opacity .15s;display:flex;gap:4px}
+.txn:hover .txn-act{opacity:1}
+.txn-act button{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-3)}
+.txn-act button:hover{background:var(--card-hover);color:var(--text)}
+.txn-act svg{width:14px;height:14px}
+
+.day-group{margin-bottom:6px}
+.day-head{display:flex;justify-content:space-between;padding:10px 4px 6px;font-size:12px;color:var(--text-3)}
+.day-head .sum{font-family:'JetBrains Mono',monospace}
+
+/* ===== 表单 ===== */
+.form-row{margin-bottom:16px}
+.form-label{display:block;font-size:12px;color:var(--text-2);margin-bottom:7px}
+.form-input,.form-select,.form-textarea{
+  width:100%;background:var(--bg-2);border:1px solid var(--border);
+  border-radius:9px;padding:10px 12px;color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--gold)}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2373798f' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+.seg{display:flex;background:var(--bg-2);border-radius:9px;padding:3px;margin-bottom:18px}
+.seg button{flex:1;padding:8px;border-radius:7px;font-size:13px;color:var(--text-2);transition:all .15s}
+.seg button.active{background:var(--card-hover);color:var(--text);font-weight:600}
+.seg button.active.expense{color:var(--red)}
+.seg button.active.income{color:var(--green)}
+
+.amount-input{
+  width:100%;background:transparent;border:none;outline:none;
+  font-family:'JetBrains Mono',monospace;font-size:38px;font-weight:600;
+  text-align:center;color:var(--text);padding:10px 0;
+  border-bottom:1px solid var(--border);margin-bottom:18px;
+}
+.amount-input::placeholder{color:var(--text-3)}
+
+.cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cat-item{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:10px 4px;border-radius:9px;cursor:pointer;
+  border:1px solid transparent;transition:all .12s;
+}
+.cat-item:hover{background:var(--card-2)}
+.cat-item.selected{background:var(--gold-dim);border-color:var(--gold)}
+.cat-item .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.cat-item .ic svg{width:18px;height:18px}
+.cat-item .nm{font-size:11px;color:var(--text-2)}
+
+/* 账户卡片 */
+.acct-card{display:flex;align-items:center;gap:12px;padding:14px;background:var(--card-2);border-radius:11px;margin-bottom:10px}
+.acct-card:last-child{margin-bottom:0}
+.acct-ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.acct-ic svg{width:19px;height:19px}
+.acct-info{flex:1}
+.acct-name{font-size:14px;font-weight:500}
+.acct-sub{font-size:11px;color:var(--text-3)}
+.acct-bal{font-size:16px;font-weight:600}
+
+/* 空态 */
+.empty{padding:40px 20px;text-align:center;color:var(--text-3);font-size:13px}
+.empty .big{font-size:36px;margin-bottom:10px;opacity:.4}
+
+/* toast */
+.toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--card-hover);border:1px solid var(--border-2);
+  padding:10px 18px;border-radius:10px;font-size:13px;
+  opacity:0;transition:all .25s;z-index:99;pointer-events:none;
+  box-shadow:var(--shadow);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* modal */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal-mask.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:420px;box-shadow:var(--shadow)}
+.modal h3{font-size:16px;margin-bottom:16px}
+
+/* 图表容器 */
+.chart-box{height:280px}
+.chart-box-sm{height:220px}
+
+/* 移动端 */
+.mobile-tab{display:none}
+@media (max-width:900px){
+  .sidebar{width:64px;padding:16px 8px}
+  .brand-name,.brand-sub,.nav-item span,.sidebar-foot{display:none}
+  .brand{justify-content:center;padding:0 0 16px}
+  .nav-item{justify-content:center;padding:11px}
+  .main{padding:18px 14px;padding-bottom:110px}
+  .grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  .cat-grid{grid-template-columns:repeat(4,1fr)}
+  .mobile-tab{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    background:var(--bg-2);border-top:1px solid var(--border);
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+    z-index:40;justify-content:space-around;
+  }
+  .mobile-tab button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--text-3);padding:4px 10px;border-radius:8px}
+  .mobile-tab button.active{color:var(--gold)}
+  .mobile-tab svg{width:20px;height:20px}
+  .mobile-tab .fab{
+    width:46px;height:46px;border-radius:50%;background:var(--gold);color:#1a1408;
+    display:flex;align-items:center;justify-content:center;margin-top:-22px;
+    box-shadow:0 4px 14px rgba(212,168,83,.4);
+  }
+  .mobile-tab .fab svg{width:22px;height:22px}
+}
+</style>
+</head>
+<body>
+<!-- 整体布局：左侧边栏 + 右侧主内容区 -->
+<div class="app">
+  <!-- 侧边栏：桌面端显示图标+文字，窄屏（手机）只显示图标 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">黑</div>
+      <div>
+        <div class="brand-name">黑马记账</div>
+        <div class="brand-sub">Personal Ledger</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <a class="nav-item" data-route="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span>仪表盘</span>
+      </a>
+      <a class="nav-item" data-route="new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+        <span>记一笔</span>
+      </a>
+      <a class="nav-item" data-route="bills">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span>账单</span>
+      </a>
+      <a class="nav-item" data-route="stats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+        <span>统计</span>
+      </a>
+      <a class="nav-item" data-route="accounts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        <span>账户</span>
+      </a>
+      <a class="nav-item" data-route="budget">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>预算</span>
+      </a>
+      <a class="nav-item" data-route="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3h.1a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.5h.1a1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8v.1a1.7 1.7 0 001.5 1h.2a2 2 0 110 4h-.2a1.7 1.7 0 00-1.5 1z"/></svg>
+        <span>设置</span>
+      </a>
+    </nav>
+    <div class="sidebar-foot">数据保存在本机浏览器</div>
+  </aside>
+
+  <!-- 主内容区：所有页面都渲染到这里 -->
+  <main class="main" id="main"></main><!-- 视图渲染到这里 --></main>
+</div>
+
+<!-- 移动端底部 tab -->
+<nav class="mobile-tab" id="mobileTab">
+  <button data-route="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>首页</button>
+  <button data-route="bills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>账单</button>
+  <button data-route="new" class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button data-route="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>统计</button>
+  <button data-route="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>我的</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div class="modal-mask" id="modalMask">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+/* ============================================================
+ * 黑马记账 —— 本地单文件记账应用
+ *
+ * 这是什么：
+ *   一个完全跑在浏览器里的个人记账本，不需要服务器、不需要登录。
+ *   你记的每一笔收支都存在浏览器的 localStorage 里，关掉再打开还在。
+ *
+ * 文件结构（从上到下）：
+ *   1. <style>     —— 所有界面样式，深色卡片风
+ *   2. <body>      —— 页面骨架：左侧菜单 + 右侧主内容区
+ *   3. <script>    —— 全部逻辑：数据、工具函数、各个页面视图
+ *
+ * 小白理解这个项目只需要记住三件事：
+ *   · state     —— 当前所有数据（账户、账单、预算），改它就等于改账本
+ *   · render()  —— 根据你在地址栏 #/ 后面写的路由，画出对应的页面
+ *   · save()    —— 每次改完 state 就调用一次，把数据写进浏览器硬盘
+ * ============================================================ */
+const STORE_KEY = 'heimabook_v1'; // 数据在 localStorage 里的 key，别乱改
+
+/* ---- 支出分类：两级结构（大类 → 小类） ----
+ * 内置分类 locked:true，用户不能删不能改；用户自建的分类 locked:false，可以增删。
+ * 账单里存的是 subcategory 的 id（唯一），展示时通过 findSub() 反查。 */
+const EXPENSE_GROUPS = [
+  {id:'food', name:'餐饮', color:'#e8a85c', icon:'bowl', locked:true, subs:[
+    {id:'food_breakfast', name:'早餐', locked:true},
+    {id:'food_lunch', name:'午餐', locked:true},
+    {id:'food_dinner', name:'晚餐', locked:true},
+    {id:'food_snack', name:'零食奶茶', locked:true},
+    {id:'food_coffee', name:'咖啡', locked:true},
+  ]},
+  {id:'grocer', name:'食材', color:'#9ccc65', icon:'cart', locked:true, subs:[
+    {id:'grocer_veg', name:'买菜生鲜', locked:true},
+    {id:'grocer_fruit', name:'水果', locked:true},
+    {id:'grocer_dairy', name:'奶制品', locked:true},
+  ]},
+  {id:'shopping', name:'购物', color:'#d47ab8', icon:'bag', locked:true, subs:[
+    {id:'shop_cloth', name:'衣服鞋包', locked:true},
+    {id:'shop_digital', name:'数码电器', locked:true},
+    {id:'shop_beauty', name:'美妆护肤', locked:true},
+    {id:'shop_daily', name:'日用百货', locked:true},
+  ]},
+  {id:'transport', name:'交通', color:'#6ba3e8', icon:'car', locked:true, subs:[
+    {id:'trans_subway', name:'地铁公交', locked:true},
+    {id:'trans_taxi', name:'打车加油', locked:true},
+    {id:'trans_rail', name:'高铁火车', locked:true},
+    {id:'trans_flight', name:'机票', locked:true},
+  ]},
+  {id:'home', name:'居住', color:'#8a7ae8', icon:'home', locked:true, subs:[
+    {id:'home_rent', name:'房租房贷', locked:true},
+    {id:'home_util', name:'水电燃气', locked:true},
+    {id:'home_wifi', name:'宽带话费', locked:true},
+  ]},
+  {id:'fun', name:'娱乐', color:'#5ec9c9', icon:'game', locked:true, subs:[
+    {id:'fun_movie', name:'电影演出', locked:true},
+    {id:'fun_game', name:'游戏充值', locked:true},
+    {id:'fun_member', name:'会员订阅', locked:true},
+  ]},
+  {id:'medical', name:'医疗', color:'#e86b6b', icon:'heart', locked:true, subs:[
+    {id:'med_drug', name:'门诊药品', locked:true},
+    {id:'med_check', name:'体检保健', locked:true},
+  ]},
+  {id:'study', name:'学习', color:'#b08968', icon:'book', locked:true, subs:[
+    {id:'study_book', name:'书籍资料', locked:true},
+    {id:'study_course', name:'课程培训', locked:true},
+  ]},
+  {id:'gift', name:'人情', color:'#d47ab8', icon:'gift', locked:true, subs:[
+    {id:'gift_red', name:'红包礼金', locked:true},
+    {id:'gift_treat', name:'请客吃饭', locked:true},
+  ]},
+  {id:'other', name:'其他', color:'#8a91a8', icon:'dots', locked:true, subs:[
+    {id:'other_exp', name:'其他支出', locked:true},
+  ]},
+];
+/* ---- 收入分类：两级结构 ---- */
+const INCOME_GROUPS = [
+  {id:'salary', name:'工资', color:'#5ec98a', icon:'wallet', locked:true, subs:[
+    {id:'salary_monthly', name:'月薪', locked:true},
+    {id:'salary_bonus', name:'年终奖', locked:true},
+  ]},
+  {id:'invest', name:'理财', color:'#6ba3e8', icon:'trend', locked:true, subs:[
+    {id:'inv_fund', name:'基金股票', locked:true},
+    {id:'inv_interest', name:'利息红包', locked:true},
+  ]},
+  {id:'parttime', name:'兼职', color:'#e8a85c', icon:'brief', locked:true, subs:[
+    {id:'pt_extra', name:'外快稿费', locked:true},
+  ]},
+  {id:'otherin', name:'其他', color:'#8a91a8', icon:'dots', locked:true, subs:[
+    {id:'other_in', name:'其他收入', locked:true},
+  ]},
+];
+
+/* ---- 内置 SVG 图标库 ----
+ * 每个图标就是一段 SVG path 字符串，iconSVG(name) 把它包成完整的 <svg>。
+ * 加新图标就在下面加一条 key:path 即可。 */
+const ICONS = {
+  bowl:'<path d="M4 11h16a8 8 0 01-16 0z"/><path d="M12 3v3M8 5c0 2 1 3 2 4M16 5c0 2-1 3-2 4"/>',
+  cart:'<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 12h11L21 7H6"/>',
+  bag:'<path d="M6 7h12l1 13H5L6 7z"/><path d="M9 7V5a3 3 0 016 0v2"/>',
+  car:'<path d="M5 16l-1-5 2-5h12l2 5-1 5"/><circle cx="7.5" cy="16" r="1.8"/><circle cx="16.5" cy="16" r="1.8"/>',
+  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  game:'<rect x="2" y="7" width="20" height="10" rx="5"/><path d="M7 10v4M5 12h4M15 11h.01M18 13h.01"/>',
+  heart:'<path d="M12 21s-7-4.5-9-9a5 5 0 019-3 5 5 0 019 3c-2 4.5-9 9-9 9z"/>',
+  book:'<path d="M4 4h11a3 3 0 013 3v13H7a3 3 0 01-3-3V4z"/><path d="M4 17a3 3 0 013-3h11"/>',
+  plane:'<path d="M10 16l-4 2 1-5 11-9 3 1-9 11-2-0z"/><path d="M7 19l-2 2 2-3"/>',
+  dots:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+  wallet:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 14h2"/>',
+  gift:'<rect x="3" y="9" width="18" height="12" rx="1"/><path d="M12 9v12M3 13h18"/><path d="M12 9s-2-6-4.5-6A2 2 0 007 6c0 2 5 3 5 3zM12 9s2-6 4.5-6A2 2 0 0117 6c0 2-5 3-5 3z"/>',
+  trend:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  brief:'<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/>',
+  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+  bank:'<path d="M3 10l9-6 9 6"/><path d="M5 10v9M9 10v9M15 10v9M19 10v9M3 21h18"/>',
+  wechat:'<path d="M9 4C5 4 2 6.7 2 10c0 1.9 1 3.6 2.6 4.7L4 17l2.6-1.3c.8.2 1.6.3 2.4.3"/><path d="M22 15c0-3-2.7-5.5-6-5.5S10 12 10 15s2.7 5.5 6 5.5c.7 0 1.4-.1 2-.3L21 21l-.5-2.2C21 17.9 22 16.5 22 15z"/>',
+};
+function iconSVG(name, color='#fff'){
+  const p = ICONS[name] || ICONS.dots;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+}
+
+/* ---- 全局状态：账本里的所有东西都在这里 ----
+ * accounts     —— 你的资金账户列表（现金、微信、银行卡…）
+ * transactions —— 所有账单流水（每一笔收支都是一条记录）
+ * budget       —— 月度预算设置
+ * currentMonth —— 当前正在看哪个月（格式 YYYY-MM，比如 "2026-10"）
+ * editingId   —— 正在编辑哪条账单的 id（null 表示是新建） */
+let state = {
+  accounts: [
+    {id:'a_cash', name:'现金',     icon:'cash',  color:'#d4a853', initial:0},
+    {id:'a_wechat',name:'微信',   icon:'wechat',color:'#5ec98a', initial:0},
+    {id:'a_bank', name:'银行卡',   icon:'bank',  color:'#6ba3e8', initial:0},
+  ],
+  transactions: [],
+  budget: { monthly: 5000 },
+  currentMonth: '',
+  editingId: null,
+  userSubs: [], // 用户自建的小类：{id, groupId, groupName, name, color, icon, locked:false}
+};
+
+/* ---- 工具函数：一些小帮手 ---- */
+function uid(){return 't'+Date.now()+Math.random().toString(36).slice(2,7)}  // 生成唯一 id，给每笔账单用
+function nowMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')} // 当前月份 YYYY-MM
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')} // 今天 YYYY-MM-DD
+function fmtMoney(n){ // 把数字格式化成 "1,234.56" 这种带千分位的钱
+  const v = Math.abs(n).toFixed(2);
+  return (n<0?'-':'') + v.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+// HTML 转义：防止用户输入的备注/账户名里带 < > " ' 破坏页面或注入脚本
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function load(){ // 启动时从浏览器硬盘读数据
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      state = Object.assign(state, d);
+      // 版本兼容：补齐可能缺失的字段，防止老数据缺字段导致白屏
+      state.budget = Object.assign({monthly:5000}, state.budget);
+      if(!Array.isArray(state.accounts)) state.accounts = [];
+      if(!Array.isArray(state.transactions)) state.transactions = [];
+      if(!Array.isArray(state.userSubs)) state.userSubs = [];
+      // 迁移：旧版扁平分类 id → 新两级小类 id
+      const legacyMap = {food:'food_lunch',grocer:'grocer_veg',shop:'shop_daily',transport:'trans_subway',
+        home:'home_util',fun:'fun_movie',medical:'med_drug',study:'study_book',travel:'other_exp',other:'other_exp',
+        salary:'salary_monthly',bonus:'salary_bonus',invest:'inv_fund',parttime:'pt_extra',otherin:'other_in'};
+      state.transactions.forEach(t=>{ if(legacyMap[t.category]) t.category = legacyMap[t.category]; });
+    }
+  }catch(e){console.warn('load fail',e)}
+  if(!state.currentMonth) state.currentMonth = nowMonth();
+}
+function save(){ // 每次改完数据就调一次，写进浏览器硬盘
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('save fail', e);
+    toast('保存失败：浏览器存储已满，请先导出备份');
+  }
+}
+function toast(msg){ // 屏幕底部弹一个小提示，1.8 秒后自动消失
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function getCats(type){ return type==='expense'?EXPENSE_GROUPS:INCOME_GROUPS } // 拿大类列表
+function getGroups(type){ return getCats(type); }
+// 根据小类 id 找它所属的大类和小类对象，返回 {group, sub}
+function findSub(type, subId){
+  const groups = getCats(type);
+  for(const g of groups){
+    const s = g.subs.find(x=>x.id===subId);
+    if(s) return {group:g, sub:s};
+  }
+  // 用户自建分类存在 state.userSubs 里
+  if(state.userSubs){
+    const u = state.userSubs.find(x=>x.id===subId);
+    if(u) return {group:{id:u.groupId, name:u.groupName, color:u.color, icon:u.icon}, sub:u};
+  }
+  // 找不到就返回兜底
+  return {group:{name:'未知',color:'#888',icon:'dots'}, sub:{name:'未知'}};
+}
+// 兼容旧调用：findCat 现在返回 {name,color,icon} 形式（合并 group+sub 的信息）
+function findCat(type, id){
+  const {group, sub} = findSub(type, id);
+  return {name: sub.name, color: group.color, icon: group.icon};
+}
+function txnsInMonth(month){ // 筛选出某个月（YYYY-MM）的所有账单
+  return state.transactions.filter(t=>t.date.startsWith(month));
+}
+function monthLabel(m){ // "2026-10" → "2026年10月"
+  const [y,mo]=m.split('-'); return `${y}年${parseInt(mo,10)}月`;
+}
+function shiftMonth(m, delta){ // 月份加减：shiftMonth("2026-01", -1) → "2025-12"
+  let [y,mo]=m.split('-').map(Number);
+  mo += delta;
+  while(mo<1){mo+=12;y--} while(mo>12){mo-=12;y++}
+  return `${y}-${String(mo).padStart(2,'0')}`;
+}
+
+/* === 渲染引擎 ===
+ * 根据地址栏 #/ 后面的路由（dashboard / new / bills / stats / accounts / budget / settings）
+ * 调用对应的视图函数，把返回的 HTML 字符串塞进 <main> 里。 */
+function render(){
+  const route = location.hash.replace('#/','') || 'dashboard';
+  renderTopbar(route);
+  const main = document.getElementById('main');
+  if(route==='dashboard') main.innerHTML = viewDashboard();
+  else if(route==='new') main.innerHTML = viewNew();
+  else if(route==='bills') main.innerHTML = viewBills();
+  else if(route==='stats') main.innerHTML = viewStats();
+  else if(route==='accounts') main.innerHTML = viewAccounts();
+  else if(route==='budget') main.innerHTML = viewBudget();
+  else if(route==='settings') main.innerHTML = viewSettings();
+  else main.innerHTML = viewDashboard();
+  document.querySelectorAll('.nav-item').forEach(a=>a.classList.toggle('active', a.dataset.route===route));
+  document.querySelectorAll('.mobile-tab button').forEach(b=>b.classList.toggle('active', b.dataset.route===route));
+  afterRender(route);
+}
+
+function renderTopbar(route){
+  // 月选择器只在部分视图显示
+  const needMonth = ['dashboard','bills','stats','budget'].includes(route);
+  const titles = {dashboard:['仪表盘','本月收支一览'],new:['记一笔','记录一笔收支'],bills:['账单','全部交易流水'],stats:['统计','收支与分类分析'],accounts:['账户','管理你的资金账户'],budget:['预算','控制每月支出'],settings:['设置','数据管理与偏好']};
+  const [t,sub] = titles[route] || titles.dashboard;
+  const picker = needMonth ? `
+    <div class="month-picker">
+      <button onclick="shiftCur(-1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="cur">${monthLabel(state.currentMonth)}</div>
+      <button onclick="shiftCur(1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>` : '';
+  window._topbarHTML = `
+    <div>
+      <div class="page-title">${t}</div>
+      <div class="page-sub">${sub}</div>
+    </div>
+    <div class="top-actions">
+      ${picker}
+      ${route==='bills'?`<button class="btn" onclick="exportCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>导出 CSV</button>`:''}
+      ${route==='new'?'':`<button class="btn btn-primary" onclick="location.hash='#/new'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>记一笔</button>`}
+    </div>`;
+}
+function shiftCur(d){ state.currentMonth = shiftMonth(state.currentMonth, d); save(); render(); }
+
+/* === 视图：仪表盘（首页） ===
+ * 展示：本月支出/收入/结余三张卡、预算使用进度、分类 TOP、最近 5 笔交易 */
+function viewDashboard(){
+  const list = txnsInMonth(state.currentMonth);
+  // 分别累加本月支出和收入（注意：金额是浮点，展示时 toFixed 兜底）
+  const exp = list.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const inc = list.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const bal = inc - exp; // 结余 = 收入 - 支出
+  const budget = state.budget.monthly;
+  const pct = budget>0 ? Math.min(100, exp/budget*100) : 0; // 预算使用率，超了就按 100% 显示
+  // 最近 5 笔：按日期倒序
+  const recent = [...list].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,5);
+  // 按分类聚合作 TOP4 展示
+  const catMap = {};
+  list.filter(t=>t.type==='expense').forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.amount});
+  const topCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
+  return `
+  <div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="grid grid-3" style="margin-bottom:14px">
+    <div class="card stat-card">
+      <div class="stat-label">本月支出</div>
+      <div class="stat-value expense num">¥${fmtMoney(exp)}</div>
+      <div class="stat-foot">预算 ¥${fmtMoney(budget)}</div>
+      <div class="stat-icon" style="background:var(--red-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="#e8735a" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">本月收入</div>
+      <div class="stat-value income num">¥${fmtMoney(inc)}</div>
+      <div class="stat-foot">共 ${list.filter(t=>t.type==='income').length} 笔入账</div>
+      <div class="stat-icon" style="background:var(--green-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="#5ec98a" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">本月结余</div>
+      <div class="stat-value num" style="color:${bal>=0?'var(--green)':'var(--red)'}">¥${fmtMoney(bal)}</div>
+      <div class="stat-foot">${bal>=0?'收大于支':'入不敷出'}</div>
+      <div class="stat-icon" style="background:var(--gold-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="#d4a853" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M9 10h4.5a1.5 1.5 0 010 3H10a1.5 1.5 0 000 3h4.5"/></svg></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-title">预算使用 <span class="more" onclick="location.hash='#/budget'">调整 →</span></div>
+      <div class="budget-row">
+        <div class="budget-head"><span>总支出</span><span class="used num">¥${fmtMoney(exp)} / ¥${fmtMoney(budget)}</span></div>
+        <div class="budget-bar"><div class="budget-fill ${pct>90?'warn':''}" style="width:${pct}%"></div></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:12px">
+        ${pct>90?'⚠ 已超出预算 90%，注意控制开支。':pct>70?'已用 '+Math.round(pct)+'%，剩余额度 ¥'+fmtMoney(Math.max(0,budget-exp))+'':'本月还可支出 ¥'+fmtMoney(Math.max(0,budget-exp))}
+      </div>
+      <div style="height:14px"></div>
+      <div class="card-title" style="margin-bottom:8px">支出分类 TOP</div>
+      ${topCats.length===0?'<div class="empty" style="padding:20px">本月还没有支出记录</div>':
+        topCats.map(([cid,amt])=>{
+          const c = findCat('expense',cid);
+          const p = exp>0?amt/exp*100:0;
+          return `<div class="budget-row">
+            <div class="budget-head"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:${c?c.color:'#888'}"></span>${c?c.name:cid}</span><span class="used num">¥${fmtMoney(amt)} · ${Math.round(p)}%</span></div>
+            <div class="budget-bar"><div class="budget-fill" style="width:${p}%;background:${c?c.color:'#888'}"></div></div>
+          </div>`;
+        }).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">最近交易 <span class="more" onclick="location.hash='#/bills'">查看全部 →</span></div>
+      <div class="txn-list">
+        ${recent.length===0?'<div class="empty"><div class="big">·</div>还没有记录<br>点击"记一笔"开始</div>':
+          recent.map(txnHTML).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 把一条账单记录渲染成一行 HTML（在流水列表、仪表盘"最近交易"里复用） */
+function txnHTML(t){
+  const c = findCat(t.type, t.category) || {name:'未知', color:'#888', icon:'dots'};
+  const acc = state.accounts.find(a=>a.id===t.accountId);
+  return `<div class="txn" data-id="${t.id}">
+    <div class="txn-icon" style="background:${c.color}22;color:${c.color}">${iconSVG(c.icon)}</div>
+    <div class="txn-main">
+      <div class="txn-cat">${c.name}</div>
+      <div class="txn-note">${esc(t.note)||'无备注'} · ${acc?esc(acc.name):''}</div>
+    </div>
+    <div class="txn-amount num ${t.type==='expense'?'exp':'inc'}">${t.type==='expense'?'-':'+'}¥${fmtMoney(t.amount)}</div>
+    <div class="txn-act">
+      <button onclick="editTxn('${t.id}')" title="编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
+      <button onclick="delTxn('${t.id}')" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
+    </div>
+  </div>`;
+}
+
+/* === 视图：记一笔 ===
+ * newForm 是表单的临时状态：groupId=当前大类，category=小类 id */
+let newForm = {type:'expense', groupId:'food', category:'food_lunch', accountId:'a_cash', date:today(), amount:'', note:''};
+function viewNew(){
+  const groups = getCats(newForm.type);
+  // 当前大类下的小类 = 内置 subs + 用户自建的属于该 group 的小类
+  const curGroup = groups.find(g=>g.id===newForm.groupId) || groups[0];
+  const userSubs = (state.userSubs||[]).filter(s=>s.groupId===curGroup.id);
+  const allSubs = [...curGroup.subs, ...userSubs];
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="card" style="max-width:680px;margin:0 auto">
+    <div class="seg">
+      <button class="${newForm.type==='expense'?'active expense':''}" onclick="setFormType('expense')">支出</button>
+      <button class="${newForm.type==='income'?'active income':''}" onclick="setFormType('income')">收入</button>
+    </div>
+    <input class="amount-input num" id="f_amount" type="number" inputmode="decimal" placeholder="0.00" value="${newForm.amount}" oninput="newForm.amount=this.value">
+    <div class="form-row">
+      <label class="form-label">大类</label>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px">
+        ${groups.map(g=>`<div onclick="setGroup('${g.id}')" style="flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;cursor:pointer;${newForm.groupId===g.id?`background:${g.color}22;color:${g.color};border:1px solid ${g.color}`:'background:var(--bg-2);border:1px solid var(--border)'}">
+          ${iconSVG(g.icon, newForm.groupId===g.id?g.color:'#a8aec2')}
+          <span style="font-size:13px">${g.name}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">小类</label>
+      <div class="cat-grid">
+        ${allSubs.map(s=>`<div class="cat-item ${newForm.category===s.id?'selected':''}" onclick="setCategory('${s.id}')">
+          <div class="ic" style="background:${curGroup.color}22;color:${curGroup.color}">${iconSVG(curGroup.icon)}</div>
+          <div class="nm">${s.name}</div>
+        </div>`).join('')}
+        <div class="cat-item" onclick="addSubDialog('${curGroup.id}')">
+          <div class="ic" style="background:var(--bg-2);color:var(--text-3)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div class="nm">新建</div>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-2">
+      <div class="form-row">
+        <label class="form-label">账户</label>
+        <select class="form-select" id="f_account" onchange="newForm.accountId=this.value">
+          ${state.accounts.map(a=>`<option value="${a.id}" ${newForm.accountId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">日期</label>
+        <input class="form-input" type="date" value="${newForm.date}" onchange="newForm.date=this.value">
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">备注（可选）</label>
+      <input class="form-input" id="f_note" type="text" placeholder="例如：午餐、地铁月票…" value="${esc(newForm.note)}" oninput="newForm.note=this.value">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;padding:12px" onclick="saveTxn()">${state.editingId?'保存修改':'保存记录'}</button>
+      ${state.editingId?`<button class="btn" onclick="cancelEdit()">取消</button>`:''}
+    </div>
+  </div>`;
+}
+function setFormType(t){
+  newForm.type=t;
+  const g = getCats(t)[0];
+  newForm.groupId = g.id;
+  newForm.category = g.subs[0].id;
+  render();
+}
+function setGroup(gid){
+  newForm.groupId = gid;
+  const g = getCats(newForm.type).find(x=>x.id===gid);
+  newForm.category = g.subs[0].id; // 切大类时默认选第一个小类
+  render();
+}
+function setCategory(cid){ newForm.category=cid; render(); }
+function cancelEdit(){ state.editingId=null; newForm={type:'expense',groupId:'food',category:'food_lunch',accountId:'a_cash',date:today(),amount:'',note:''}; location.hash='#/dashboard'; }
+/* 在当前大类下新建小类 */
+function addSubDialog(groupId){
+  const name = prompt('新小类名称：');
+  if(!name || !name.trim()) return;
+  if(!state.userSubs) state.userSubs = [];
+  const g = getCats(newForm.type).find(x=>x.id===groupId);
+  const sub = {
+    id: 'u_'+Date.now(),
+    groupId: groupId,
+    groupName: g.name,
+    name: name.trim(),
+    color: g.color,
+    icon: g.icon,
+    locked: false,
+  };
+  state.userSubs.push(sub);
+  newForm.groupId = groupId;
+  newForm.category = sub.id;
+  save(); toast('已新增分类'); render();
+}
+/* 保存账单：校验金额 → 写入 state.transactions → save() 落盘 → 跳回首页 */
+function saveTxn(){
+  const amt = parseFloat(newForm.amount);
+  // 基础校验：金额必须 > 0，账户必须选
+  if(!amt || amt<=0){ toast('请输入有效金额'); return; }
+  if(!newForm.accountId){ toast('请选择账户'); return; }
+  // 组装一条账单记录：编辑就覆盖，新建就 push
+  const data = {
+    id: state.editingId || uid(),
+    type: newForm.type,
+    amount: Math.round(amt*100)/100, // 四舍五入到分，避免 0.1+0.2 这种浮点尾巴
+    category: newForm.category,
+    accountId: newForm.accountId,
+    date: newForm.date || today(),
+    note: newForm.note.trim(),
+  };
+  if(state.editingId){
+    const i = state.transactions.findIndex(t=>t.id===state.editingId);
+    if(i>=0) state.transactions[i]=data;
+  }else{
+    state.transactions.push(data);
+  }
+  save(); toast(state.editingId?'已更新':'已记录');
+  state.editingId=null;
+  newForm={type:'expense',category:'food',accountId:newForm.accountId||'a_cash',date:today(),amount:'',note:''};
+  location.hash='#/dashboard';
+}
+function fillEditForm(id){
+  const t = state.transactions.find(x=>x.id===id);
+  if(!t) return;
+  state.editingId = id;
+  newForm = {type:t.type, category:t.category, accountId:t.accountId, date:t.date, amount:String(t.amount), note:t.note||''};
+  render();
+}
+
+/* === 视图：账单（流水列表）===
+ * 按日期分组展示，可按 全部/支出/收入 筛选 */
+let billFilter = 'all'; // all | expense | income
+function viewBills(){
+  let list = txnsInMonth(state.currentMonth);
+  if(billFilter!=='all') list = list.filter(t=>t.type===billFilter);
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  // 按日期分组
+  const groups = {};
+  list.forEach(t=>{ (groups[t.date]=groups[t.date]||[]).push(t); });
+  const dates = Object.keys(groups).sort().reverse();
+  const sum = list.reduce((s,t)=>s+(t.type==='expense'?-t.amount:t.amount),0);
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+      <div class="seg" style="margin:0;margin-right:auto;min-width:260px">
+        <button class="${billFilter==='all'?'active':''}" onclick="setBillFilter('all')">全部</button>
+        <button class="${billFilter==='expense'?'active expense':''}" onclick="setBillFilter('expense')">支出</button>
+        <button class="${billFilter==='income'?'active income':''}" onclick="setBillFilter('income')">收入</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-3)">本月净流出 <span class="num" style="color:${sum>=0?'var(--green)':'var(--red)'}">${sum>=0?'+':''}¥${fmtMoney(sum)}</span></div>
+    </div>
+    ${dates.length===0?'<div class="empty"><div class="big">·</div>本月没有记录</div>':
+      dates.map(d=>{
+        const arr = groups[d];
+        const dayExp = arr.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+        const dayInc = arr.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+        const [y,mo,da]=d.split('-');
+        const dt = new Date(y,mo-1,da);
+        const week = ['日','一','二','三','四','五','六'][dt.getDay()];
+        return `<div class="day-group">
+          <div class="day-head"><span>${parseInt(mo,10)}月${parseInt(da,10)}日 周${week}</span><span class="sum">${dayExp?'支 ¥'+fmtMoney(dayExp):''} ${dayInc?'收 ¥'+fmtMoney(dayInc):''}</span></div>
+          ${arr.map(txnHTML).join('')}
+        </div>`;
+      }).join('')}
+  </div>`;
+}
+function setBillFilter(f){ billFilter=f; render(); }
+
+/* === 导出 CSV ===
+ * 把所有账单转成 CSV 文件下载，开头加 \uFEFF 是为了让 Excel 正确识别 UTF-8 中文 */
+function exportCSV(){
+  const rows = [['日期','类型','分类','账户','金额','备注']];
+  const list = [...state.transactions].sort((a,b)=>a.date.localeCompare(b.date));
+  list.forEach(t=>{
+    const c = findCat(t.type,t.category)||{name:t.category};
+    const a = state.accounts.find(x=>x.id===t.accountId)||{name:''};
+    rows.push([t.date, t.type==='expense'?'支出':'收入', c.name, a.name, t.amount.toFixed(2), (t.note||'').replace(/[\r\n,]/g,' ')]);
+  });
+  const csv = '\uFEFF' + rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `黑马记账_${today()}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('已导出 CSV');
+}
+
+/* === 视图：统计 ===
+ * 两个 ECharts 图：近 6 个月收支柱状图、本月支出分类饼图 */
+function viewStats(){
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="grid grid-2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">近 6 个月收支</div>
+      <div class="chart-box" id="ch_trend"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">本月支出分类</div>
+      <div class="chart-box" id="ch_pie"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">本月分类明细</div>
+    <div id="ch_detail"></div>
+  </div>`;
+}
+/* 真正画 ECharts 图表的函数：等 DOM 里的容器 div 渲染出来后再初始化 */
+function renderStatsCharts(){
+  if(typeof echarts==='undefined'){ setTimeout(renderStatsCharts, 100); return; }
+  // 近 6 个月
+  const months = [];
+  let m = state.currentMonth;
+  for(let i=0;i<6;i++){ months.unshift(m); m = shiftMonth(m,-1); }
+  const expArr=[], incArr=[];
+  months.forEach(mm=>{
+    const l = txnsInMonth(mm);
+    expArr.push(Math.round(l.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0)*100)/100);
+    incArr.push(Math.round(l.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)*100)/100);
+  });
+  const chartTheme = {
+    backgroundColor:'transparent',
+    textStyle:{color:'#a8aec2',fontFamily:'Noto Sans SC'},
+  };
+  const t1 = echarts.init(document.getElementById('ch_trend'));
+  t1.setOption({
+    ...chartTheme,
+    tooltip:{trigger:'axis',backgroundColor:'#232735',borderColor:'#353a4d',textStyle:{color:'#eef0f6'}},
+    legend:{data:['支出','收入'],textStyle:{color:'#a8aec2'},top:0,right:0,itemWidth:12,itemHeight:8},
+    grid:{left:40,right:14,top:36,bottom:26},
+    xAxis:{type:'category',data:months.map(x=>parseInt(x.split('-')[1])+'月'),axisLine:{lineStyle:{color:'#2a2e3d'}},axisLabel:{color:'#73798f'}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:'#232735'}},axisLabel:{color:'#73798f'}},
+    series:[
+      {name:'支出',type:'bar',data:expArr,itemStyle:{color:'#e8735a',borderRadius:[4,4,0,0]},barWidth:14},
+      {name:'收入',type:'bar',data:incArr,itemStyle:{color:'#5ec98a',borderRadius:[4,4,0,0]},barWidth:14},
+    ]
+  });
+
+  // 本月分类饼图
+  const list = txnsInMonth(state.currentMonth).filter(t=>t.type==='expense');
+  const map = {};
+  list.forEach(t=>{ map[t.category]=(map[t.category]||0)+t.amount; });
+  const pieData = Object.entries(map).map(([cid,val])=>{
+    const c = findCat('expense',cid)||{name:cid,color:'#888'};
+    return {name:c.name, value:Math.round(val*100)/100, itemStyle:{color:c.color}};
+  });
+  const t2 = echarts.init(document.getElementById('ch_pie'));
+  t2.setOption({
+    ...chartTheme,
+    tooltip:{trigger:'item',backgroundColor:'#232735',borderColor:'#353a4d',textStyle:{color:'#eef0f6'},formatter:'{b}: ¥{c} ({d}%)'},
+    legend:{orient:'vertical',right:0,top:'middle',textStyle:{color:'#a8aec2',fontSize:12},itemWidth:10,itemHeight:10},
+    series:[{
+      type:'pie',radius:['45%','72%'],center:['38%','50%'],
+      avoidLabelOverlap:true,label:{show:false},
+      data:pieData.length?pieData:[{name:'暂无数据',value:1,itemStyle:{color:'#2a2e3d'}}]
+    }]
+  });
+
+  // 明细横向条形
+  const sorted = pieData.sort((a,b)=>b.value-a.value);
+  const detailEl = document.getElementById('ch_detail');
+  if(sorted.length===0 || (sorted.length===1&&sorted[0].name==='暂无数据')){
+    detailEl.innerHTML = '<div class="empty">本月还没有支出数据</div>';
+  }else{
+    const total = sorted.reduce((s,x)=>s+x.value,0);
+    detailEl.innerHTML = sorted.map(x=>{
+      const p = total>0?x.value/total*100:0;
+      return `<div class="budget-row">
+        <div class="budget-head"><span>${x.name}</span><span class="used num">¥${fmtMoney(x.value)} · ${Math.round(p)}%</span></div>
+        <div class="budget-bar"><div class="budget-fill" style="width:${p}%;background:${x.itemStyle.color}"></div></div>
+      </div>`;
+    }).join('');
+  }
+  window.addEventListener('resize', ()=>{t1.resize();t2.resize();});
+}
+
+/* === 视图：账户 === */
+/* 算某个账户的实时余额：初始余额 + 入账 - 支出 */
+function acctBalance(a){
+  const out = state.transactions.filter(t=>t.accountId===a.id&&t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const inc = state.transactions.filter(t=>t.accountId===a.id&&t.type==='income').reduce((s,t)=>s+t.amount,0);
+  return a.initial + inc - out;
+}
+function viewAccounts(){
+  const total = state.accounts.reduce((s,a)=>s+acctBalance(a),0);
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#1c1f2a 0%,#2a2518 100%)">
+    <div class="stat-label">全部账户总余额</div>
+    <div class="stat-value num" style="color:var(--gold-2);font-size:34px;margin-top:4px">¥${fmtMoney(total)}</div>
+    <div class="stat-foot" style="margin-top:8px">${state.accounts.length} 个账户 · 含初始余额</div>
+  </div>
+  <div class="card">
+    <div class="card-title">账户列表 <button class="btn" style="padding:4px 10px;font-size:12px" onclick="addAccount()">+ 新增账户</button></div>
+    ${state.accounts.map(a=>{
+      const bal = acctBalance(a);
+      return `<div class="acct-card">
+        <div class="acct-ic" style="background:${a.color}22;color:${a.color}">${iconSVG(a.icon)}</div>
+        <div class="acct-info">
+          <div class="acct-name">${esc(a.name)}</div>
+          <div class="acct-sub">初始 ¥${fmtMoney(a.initial)}</div>
+        </div>
+        <div class="acct-bal num" style="color:${bal>=0?'var(--text)':'var(--red)'}">¥${fmtMoney(bal)}</div>
+        <div class="txn-act" style="opacity:1">
+          <button onclick="editAccount('${a.id}')" title="编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4v16h16v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function addAccount(){ openAccountModal(null); }
+function editAccount(id){ openAccountModal(id); }
+function openAccountModal(id){
+  const a = id ? state.accounts.find(x=>x.id===id) : {name:'',icon:'wallet',color:'#d4a853',initial:0};
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `<h3>${id?'编辑账户':'新增账户'}</h3>
+    <div class="form-row"><label class="form-label">名称</label><input class="form-input" id="m_name" value="${esc(a.name)}" placeholder="如：招商卡"></div>
+    <div class="form-row"><label class="form-label">初始余额</label><input class="form-input num" id="m_init" type="number" step="0.01" value="${a.initial}"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveAccount('${id||''}')">保存</button>
+    </div>`;
+  document.getElementById('modalMask').classList.add('show');
+  setTimeout(()=>document.getElementById('m_name').focus(),50);
+}
+function closeModal(){ document.getElementById('modalMask').classList.remove('show'); }
+function saveAccount(id){
+  const name = document.getElementById('m_name').value.trim();
+  const init = parseFloat(document.getElementById('m_init').value)||0;
+  if(!name){ toast('请输入账户名'); return; }
+  if(id){
+    const a = state.accounts.find(x=>x.id===id);
+    a.name=name; a.initial=init;
+  }else{
+    state.accounts.push({id:'a_'+Date.now(), name, icon:'wallet', color:'#d4a853', initial:init});
+  }
+  save(); closeModal(); toast('已保存'); render();
+}
+document.getElementById('modalMask').addEventListener('click', e=>{ if(e.target.id==='modalMask') closeModal(); });
+
+/* === 视图：预算 ===
+ * 展示本月预算总额、已用比例、剩余额度，给使用建议 */
+function viewBudget(){
+  const exp = txnsInMonth(state.currentMonth).filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const b = state.budget.monthly;
+  const pct = b>0?Math.min(100,exp/b*100):0;
+  const remain = b-exp;
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-title">月度总预算</div>
+      <div style="text-align:center;padding:10px 0 18px">
+        <div style="font-size:13px;color:var(--text-3);margin-bottom:8px">${monthLabel(state.currentMonth)}</div>
+        <div class="num" style="font-size:44px;font-weight:700;color:var(--gold-2)">¥${fmtMoney(b)}</div>
+      </div>
+      <div class="budget-row">
+        <div class="budget-head"><span>已使用</span><span class="used num">¥${fmtMoney(exp)} / ¥${fmtMoney(b)}</span></div>
+        <div class="budget-bar" style="height:10px"><div class="budget-fill ${pct>90?'warn':''}" style="width:${pct}%"></div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-top:10px">
+        <span>已用 ${Math.round(pct)}%</span>
+        <span>剩余 <span class="num" style="color:${remain<0?'var(--red)':'var(--green)'}">¥${fmtMoney(remain)}</span></span>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px">
+        <button class="btn" style="flex:1;justify-content:center" onclick="editBudget()">修改预算</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">使用建议</div>
+      <div style="font-size:13px;color:var(--text-2);line-height:1.9">
+        ${remain<0?`<p style="color:var(--red)">本月已超支 ¥${fmtMoney(-remain)}。</p><p>建议：在统计页查看哪些分类花超了，下月针对性下调。</p>`:
+          pct>70?`<p>本月已用 ${Math.round(pct)}% 预算，按当前节奏预计会超支。</p><p>建议：非必要开支延后到下个月。</p>`:
+          `<p>预算使用节奏健康。</p><p>剩余 ¥${fmtMoney(remain)} 可灵活支配。</p>`}
+        <div style="height:10px"></div>
+        <p style="color:var(--text-3);font-size:12px">小技巧：把月预算除以 30 就是日均可用额度，花钱前先看一眼。</p>
+      </div>
+    </div>
+  </div>`;
+}
+function editBudget(){
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `<h3>设置月度预算</h3>
+    <div class="form-row"><label class="form-label">预算金额（元）</label><input class="form-input num" id="m_budget" type="number" step="100" value="${state.budget.monthly}"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveBudget()">保存</button>
+    </div>`;
+  document.getElementById('modalMask').classList.add('show');
+  setTimeout(()=>document.getElementById('m_budget').focus(),50);
+}
+function saveBudget(){
+  const v = parseFloat(document.getElementById('m_budget').value);
+  if(!v||v<0){ toast('请输入有效金额'); return; }
+  state.budget.monthly = v;
+  save(); closeModal(); toast('预算已更新'); render();
+}
+
+/* === 视图：设置 ===
+ * 数据管理：导出 CSV、导出 JSON 备份、从备份恢复、清空全部数据 */
+function viewSettings(){
+  const txnCount = state.transactions.length;
+  return `<div style="margin-bottom:18px">${window._topbarHTML}</div>
+  <div class="card" style="max-width:640px">
+    <div class="card-title">数据管理</div>
+    <div style="font-size:13px;color:var(--text-2);line-height:1.9;margin-bottom:16px">
+      当前共有 <b class="num">${txnCount}</b> 笔记录。数据保存在本浏览器的 localStorage 中，<b>清理浏览器缓存会丢失</b>，请定期导出备份。
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn" style="justify-content:flex-start;padding:12px" onclick="exportCSV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        导出全部记录为 CSV
+      </button>
+      <button class="btn" style="justify-content:flex-start;padding:12px" onclick="exportJSON()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        备份完整数据（JSON，含账户与预算）
+      </button>
+      <button class="btn" style="justify-content:flex-start;padding:12px" onclick="document.getElementById('impFile').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        从备份恢复
+      </button>
+      <input type="file" id="impFile" accept="application/json" style="display:none" onchange="importJSON(this)">
+      <button class="btn btn-danger" style="justify-content:flex-start;padding:12px" onclick="clearAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        清空所有数据
+      </button>
+    </div>
+    <div style="height:18px"></div>
+    <div class="card-title">关于</div>
+    <div style="font-size:12px;color:var(--text-3);line-height:1.8">
+      黑马记账 v1.0 · 个人本地账本<br>
+      数据不出本机 · 无需注册 · 双击 HTML 即可使用
+    </div>
+  </div>`;
+}
+/* 导出完整备份：把整个 state 存成 JSON 文件，换电脑时用"从备份恢复"导回来 */
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`黑马记账备份_${today()}.json`; a.click();
+  URL.revokeObjectURL(url); toast('已备份');
+}
+/* 从 JSON 备份恢复：读取用户选的文件 → 解析 → 覆盖当前 state → 保存 */
+function importJSON(input){
+  const f = input.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const d = JSON.parse(e.target.result);
+      if(!d.transactions || !d.accounts) throw new Error('bad format');
+      if(confirm('恢复将覆盖当前所有数据，确定？')){
+        state = Object.assign(state, d);
+        save(); render(); toast('已恢复');
+      }
+    }catch(err){ alert('备份文件格式不正确'); }
+  };
+  reader.readAsText(f);
+  input.value='';
+}
+function clearAll(){
+  if(confirm('确定要清空所有记录、账户和预算？此操作不可恢复。')){
+    if(confirm('再确认一次：真的要全部删除吗？')){
+      localStorage.removeItem(STORE_KEY);
+      location.reload();
+    }
+  }
+}
+
+/* === 渲染后钩子 === */
+function afterRender(route){
+  if(route==='stats') setTimeout(renderStatsCharts, 50);
+}
+
+/* === 事件绑定：侧边栏和底部 tab 的点击都走这里 === */
+document.querySelectorAll('[data-route]').forEach(el=>{
+  el.addEventListener('click', e=>{
+    e.preventDefault();
+    location.hash = '#/'+el.dataset.route; // 改 hash 就会触发 hashchange → render()
+  });
+});
+window.addEventListener('hashchange', render); // 监听地址栏 hash 变化
+
+/* === 操作函数：编辑/删除一笔账单 === */
+function editTxn(id){ location.hash='#/new'; setTimeout(()=>fillEditForm(id), 50); }
+function delTxn(id){
+  if(confirm('确定删除这笔记录？')){
+    state.transactions = state.transactions.filter(t=>t.id!==id);
+    save(); toast('已删除'); render();
+  }
+}
+
+/* === 启动 === */
+load();  // 1. 读 localStorage 里的历史数据
+render(); // 2. 画首页
+</script>
+</body>
+</html>

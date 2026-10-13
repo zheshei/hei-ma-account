@@ -1,0 +1,5 @@
+_shots/
+_backup/
+.gate/
+*.log
+.DS_Store
